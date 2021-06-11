@@ -14,14 +14,18 @@
 FROM centos:7 AS builder
 
 ENV PATH /usr/share/elasticsearch/bin:$PATH
-ENV JAVA_HOME /opt/jdk-12.0.1
+# ENV JAVA_HOME /opt/jdk-12.0.1
+ENV JAVA_HOME /opt/zulu11.48.21-ca-jdk11.0.11-linux_aarch64
 
-RUN curl --retry 8 -s https://download.oracle.com/java/GA/jdk12.0.1/69cfe15208a647278a19ef0990eea691/12/GPL/openjdk-12.0.1_linux-x64_bin.tar.gz | tar -C /opt -zxf -
+# RUN curl --retry 8 -s https://download.oracle.com/java/GA/jdk12.0.1/69cfe15208a647278a19ef0990eea691/12/GPL/openjdk-12.0.1_linux-x64_bin.tar.gz | tar -C /opt -zxf -
+# RUN curl --retry 8 -s https://download.oracle.com/java/GA/jdk15/779bf45e88a44cbd9ea6621d33e33db1/36/GPL/openjdk-15_linux-aarch64_bin.tar.gz | tar -C /opt -zxf -
+RUN curl --retry 8 -s https://cdn.azul.com/zulu-embedded/bin/zulu11.48.21-ca-jdk11.0.11-linux_aarch64.tar.gz | tar -C /opt -zxf -
 
 # Replace OpenJDK's built-in CA certificate keystore with the one from the OS
 # vendor. The latter is superior in several ways.
 # REF: https://github.com/elastic/elasticsearch-docker/issues/171
-RUN ln -sf /etc/pki/ca-trust/extracted/java/cacerts /opt/jdk-12.0.1/lib/security/cacerts
+# RUN ln -sf /etc/pki/ca-trust/extracted/java/cacerts /opt/jdk-12.0.1/lib/security/cacerts
+RUN ln -sf /etc/pki/ca-trust/extracted/java/cacerts /opt/zulu11.48.21-ca-jdk11.0.11-linux_aarch64/lib/security/cacerts
 
 RUN yum install -y unzip which
 
@@ -39,6 +43,9 @@ RUN mkdir -p config data logs
 RUN chmod 0775 config data logs
 COPY config/elasticsearch.yml config/log4j2.properties config/
 
+# AVX are not supported on ARM architectures, but elasticsearch 6 enables this by default. Disable it.
+RUN sed -i '/UseAVX/d' config/jvm.options
+
 ################################################################################
 # Build stage 1 (the actual elasticsearch image):
 # Copy elasticsearch from stage 0
@@ -48,9 +55,10 @@ COPY config/elasticsearch.yml config/log4j2.properties config/
 FROM centos:7
 
 ENV ELASTIC_CONTAINER true
-ENV JAVA_HOME /opt/jdk-12.0.1
+# ENV JAVA_HOME /opt/jdk-12.0.1
+ENV JAVA_HOME /opt/zulu11.48.21-ca-jdk11.0.11-linux_aarch64
 
-COPY --from=builder /opt/jdk-12.0.1 /opt/jdk-12.0.1
+COPY --from=builder /opt/zulu11.48.21-ca-jdk11.0.11-linux_aarch64 /opt/zulu11.48.21-ca-jdk11.0.11-linux_aarch64
 
 RUN for iter in {1..10}; do yum update -y && \
     yum install -y nc unzip wget which && \
